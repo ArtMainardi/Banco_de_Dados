@@ -1,3 +1,4 @@
+-- Active: 1778890069814@@mysql-1da9a69f-testeteste.g.aivencloud.com@12606@DB_SUPERVALENTIM_ATACADISTA
 # == ARTHUR == #
 # Query 0
 SELECT 
