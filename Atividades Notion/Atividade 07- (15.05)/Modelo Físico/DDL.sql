@@ -41,6 +41,7 @@ CREATE TABLE funcionarios (
 # --- Tabela Clientes:
 CREATE TABLE clientes (
     id_cliente INT PRIMARY KEY AUTO_INCREMENT,
+    nome_cliente
     cpf_cliente CHAR(11),
     telefone_cliente CHAR(11),
     idade_cliente INT,
