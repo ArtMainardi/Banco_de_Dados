@@ -1,0 +1,116 @@
+# https://app.notion.com/p/Desafio-An-lise-e-Normaliza-o-de-Banco-de-Dados-381edc33d7e580febd64ee695343a14f?source=copy_link
+
+=== 1- Identifique possíveis problemas de redundância existentes nos dados. ===
+A estrutura atual apresenta uma alta duplicidade de dados redundantes (informações de clientes, equipamentos, técnicos e fornecedores).
+Esses dados são repetidos desnecessariamente em múltiplas linhas apenas para registrar o uso de peças diferentes ou ordens de serviço 
+distintas, evidenciando a falta de normalização no banco de dados.
+
+
+=== 2- Identifique exemplos de: anomalia de inserção; anomalia de atualização; anomalia de exclusão. ===
+-> Anomalia de Inserção: Impede o cadastro de novos fornecedores ou peças no estoque até que sejam vinculados a uma Ordem de Serviço (OS).
+-> Anomalia de Atualização: Exige a alteração de um mesmo dado (como o telefone do cliente) em múltiplas linhas, gerando alto risco de 
+inconsistência se alguma linha for esquecida.
+-> Anomalia de Exclusão: Causa a perda inadvertida de dados essenciais (como o cadastro de técnicos, fornecedores e preços de peças) ao 
+deletar uma OS do sistema.
+
+
+=== 3- Analise as dependências funcionais existentes na estrutura. ===
+CodigoOS -> DataOS, Cliente, TelefoneCliente, CidadeCliente, Equipamento, CategoriaEquipamento, Tecnico, CargoTecnico, TelefoneTecnico
+Cliente -> TelefoneCliente, CidadeCliente
+Equipamento -> CategoriaEquipamento
+Tecnico -> CargoTecnico, TelefoneTecnico
+PecaUtilizada -> ValorPeca, FornecedorPeca, CidadeFornecedorPeca
+FornecedorPeca -> CidadeFornecedorPeca
+(CodigoOS, PecaUtilizada) -> QuantidadePeca
+
+
+=== 4- Verifique a necessidade de aplicação da: Primeira Forma Normal (1FN); Segunda Forma Normal (2FN); Terceira Forma Normal (3FN). ===
+-> 1FN
+    A tabela já está na 1FN visualmente, pois não há listas ou múltiplos valores guardados em uma única célula.
+    No entanto, ela possui linhas repetidas para a mesma OS devido à granularidade da peça.
+
+-> 2FN
+    Atributos como DataOS, Cliente e Tecnico dependem apenas de CodigoOS. Atributos como ValorPeca e FornecedorPeca dependem apenas de PecaUtilizada.
+
+-> 3FN
+    O CodigoOS determina o Cliente, mas é o Cliente quem determina o Telefone e a Cidade. O mesmo erro ocorre com os dados do Tecnico.
+    A PecaUtilizada determina o Fornecedor, mas é o Fornecedor quem determina a Cidade.
+
+
+=== 5- Realize o processo de normalização até o nível considerado necessário para a situação apresentada. ===
+-> 2FN
+    Separar a tabela em três visões iniciais para eliminar a dependência parcial:
+    - Ordem_Servico (Chave: CodigoOS)
+    - Peca (Chave: NomePeca)
+    - Item_OS (Chave Composta: CodigoOS + NomePeca para armazenar a QuantidadePeca)
+
+-> 3FN
+    Isolar todas as entidades independentes.
+
+
+=== 6- Apresente as entidades resultantes da normalização ===
+1. Tabela: CLIENTE
+    id_cliente INT [PK] [AutoIncrement]
+    nome_cliente VARCHAR(100) [Not Null]
+    telefone_cliente VARCHAR(20)
+    cidade_cliente VARCHAR(50)
+
+2. Tabela: EQUIPAMENTO
+    id_equipamento INT [PK] [AutoIncrement]
+    nome_equipamento VARCHAR(100) [Not Null]
+    categoria_equipamento VARCHAR(50)
+
+3. Tabela: TECNICO
+    id_tecnico INT [PK] [AutoIncrement]
+    nome_tecnico VARCHAR(100) [Not Null]
+    cargo_tecnico VARCHAR(50)
+    telefone_tecnico VARCHAR(20)
+
+4. Tabela: FORNECEDOR
+    id_fornecedor INT [PK] [AutoIncrement]
+    nome_fornecedor VARCHAR(100) [Not Null]
+    cidade_fornecedor VARCHAR(50)
+
+5. Tabela: PECA
+    id_peca INT [PK] [AutoIncrement]
+    nome_peca VARCHAR(100) [Not Null]
+    valor_peca DECIMAL(10,2) [Not Null]
+    id_fornecedor INT [FK -> FORNECEDOR.id_fornecedor]
+
+6. Tabela: ORDEM_SERVICO
+    codigo_os INT [PK] (Mantido o código original)
+    data_os DATE [Not Null]
+    id_cliente INT [FK -> CLIENTE.id_cliente]
+    id_equipamento INT [FK -> EQUIPAMENTO.id_equipamento]
+    id_tecnico INT [FK -> TECNICO.id_tecnico]
+
+7. Tabela: ITEM_ORDEM_SERVICO (Tabela Relacional N:M)
+    codigo_os INT [PK][FK -> ORDEM_SERVICO.codigo_os]
+    id_peca INT [PK][FK -> PECA.id_peca]
+    quantidade_peca INT [Not Null] [Constraint: CHECK (quantidade_peca > 0)]
+
+
+=== 7- Descreva os relacionamentos existentes entre as entidades geradas ===
+-> CLIENTE para ORDEM_SERVICO (1:N): Um cliente pode abrir várias ordens de serviço, mas uma ordem de serviço específica pertence a apenas um cliente.
+-> EQUIPAMENTO para ORDEM_SERVICO (1:N): Um equipamento pode sofrer várias manutenções (OS) ao longo do tempo, mas uma OS específica é realizada em 
+um equipamento por vez.
+-> TECNICO para ORDEM_SERVICO (1:N): Um técnico pode ser responsável por várias ordens de serviço, mas cada OS possui um técnico principal alocado.
+-> FORNECEDOR para PECA (1:N): Um fornecedor pode fornecer diversas peças diferentes para a empresa, mas cada peça é mapeada para o seu fornecedor homologado.
+-> ORDEM_SERVICO para PECA (N:M - Reduzido para duas relações 1:N): Uma Ordem de Serviço pode utilizar várias peças, e uma peça pode ser utilizada em 
+várias Ordens de Serviço. Esse relacionamento gerou a tabela associativa ITEM_ORDEM_SERVICO.
+
+
+=== 8- Justifique tecnicamente cada alteração realizada durante o processo de normalização. ===
+-> Uso de Chaves Substitutas (IDs numéricos): Evita o uso de textos (como nomes de clientes ou peças) como chaves primárias. IDs numéricos reduzem o tamanho 
+físico do banco de dados, melhoram a indexação e aceleram drasticamente a execução de comandos JOIN.
+-> Separação entre Fornecedor e Peça (Normalização): Garante a integridade dos dados. Se um fornecedor mudar de cidade, atualiza-se apenas uma linha na tabela 
+FORNECEDOR, e a mudança reflete automaticamente para todas as peças vinculadas, eliminando redundâncias.
+-> Isolamento da Quantidade (Tabela de Junção): A quantidade de peças é um atributo que depende tanto da Ordem de Serviço quanto da Peça em si. Por isso, ela 
+pertence exclusivamente à tabela de relacionamento (ITEM_ORDEM_SERVICO), respeitando a regra de que dados de movimentação devem ficar na tabela de junção.
+
+
+=== 9- Explique quais problemas foram eliminados após a reestruturação do banco de dados. ===
+-> Fim da Duplicidade: O nome do cliente, do técnico e do fornecedor são salvos uma única vez em suas respectivas tabelas.
+-> Eliminação de Anomalias: Agora é possível cadastrar novas peças que acabaram de chegar ao estoque sem precisar vinculá-las a uma OS inexistente. Se uma OS for 
+deletada, o histórico do cliente e do técnico continuam intactos no sistema.
+-> Performance: Consultas de relatórios ficarão infinitamente mais rápidas através de índices nas Chaves Primárias, diminuindo o tempo de resposta do sistema.
